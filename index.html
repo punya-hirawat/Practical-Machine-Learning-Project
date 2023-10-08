@@ -689,6 +689,41 @@ for accurate predictions outside of the data set.</p>
 <p>In Model 2, we will be training and predicting using the aggregate
 sensor data. We will use gradient boosting and bootstrapping for
 cross-validation of the model</p>
+<pre class="r"><code>aggregate_gbm = train(classe~., method = &quot;gbm&quot;, trControl = bootstrapping, data = train_aggregate[,-c(1:7)])</code></pre>
+<pre class="r"><code>pred_aggregate_gbm = predict(aggregate_gbm, testing)
+confusionMatrix(pred_aggregate_gbm, as.factor(testing$classe))</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1483  142   25   60   50
+##          B   90  797   80   68  103
+##          C   40  117  864  118   61
+##          D   33   32   44  662   65
+##          E   28   51   13   56  803
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.7832          
+##                  95% CI : (0.7724, 0.7936)
+##     No Information Rate : 0.2845          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.7252          
+##                                           
+##  Mcnemar&#39;s Test P-Value : &lt; 2.2e-16       
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.8859   0.6997   0.8421   0.6867   0.7421
+## Specificity            0.9342   0.9282   0.9308   0.9646   0.9692
+## Pos Pred Value         0.8426   0.7004   0.7200   0.7919   0.8444
+## Neg Pred Value         0.9537   0.9280   0.9654   0.9402   0.9435
+## Prevalence             0.2845   0.1935   0.1743   0.1638   0.1839
+## Detection Rate         0.2520   0.1354   0.1468   0.1125   0.1364
+## Detection Prevalence   0.2991   0.1934   0.2039   0.1421   0.1616
+## Balanced Accuracy      0.9101   0.8139   0.8865   0.8257   0.8557</code></pre>
 <p>This model sees a large drop in accuracy, falling down to 78%. This
 can be seen as a positive as the chances of over-fitting drop, but the
 loss in accuracy is not something we can compromise on.</p>
