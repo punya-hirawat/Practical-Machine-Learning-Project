@@ -1,0 +1,131 @@
+---
+title: "Practical Machine Learning Project - Sensor Data"
+author: "Punya Hirawat"
+date: "2023-10-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+# Human Activity Recognition
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. The goal of this project is to predict how well a bicep curl was performed using the data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. Data for this project comes from http://groupware.les.inf.puc-rio.br/har
+
+Six participants performed 10 bicep curls in five different fashions: exactly according to the correct specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+This project involves building a model on the data present in this data set to predict whether someone is performing the action of a bicep curl and if they are committing an error, what the error is
+
+## Data Processing
+
+After downloading and loading the data into the environment, the first thing checked is the structure of the data
+```{r}
+# Setting seed for reproducibility
+set.seed(123456)
+
+# Downloading and Loading the data
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "pml_training.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "pml_testing.csv")
+
+validation = read.csv("pml_testing.csv")
+data = read.csv("pml_training.csv")
+
+str(data)
+```
+
+As we can see, there are a lot of rows which have NA values. Thus, we need to find which rows have NA values and how many there are so that we can remove them if they are unnecessary
+
+```{r}
+# Assigning NA to any empty spaces and DIV/0 errors
+data[data == ""] = NA
+data[data == "<NA>"] = NA
+data[data == "#DIV/0!"] = NA
+
+# Checking which columns have NA values
+colSums(is.na(data))
+```
+
+The columns which have NA values have almost 100% of NA values. Thus, these columns can be removed without hurting the prediction of data.
+
+```{r}
+# Removing any column that has NA values
+data_clean = data[colSums(is.na(data)) == 0]
+```
+
+Let us check if the clean data has any NA values
+
+```{r}
+# Checking the new clean data
+which(complete.cases(data_clean)==FALSE)
+```
+
+There are no more NA values, which means we can move onto processing the data so its fit for prediction.
+First, we partition the data into training and testing
+```{r}
+library(caret)
+
+# Partitioning the data into training and testing
+part = createDataPartition(data_clean$classe, p = 0.7, list = F)
+training = data_clean[part,]
+testing = data_clean[-part,]
+```
+
+Then, the data is divided into raw sensor data and aggregated summary data using the value of the new_window column. Each of these will be used for prediction.
+```{r}
+# Dividing the training data set into raw sensor data and aggregate data
+train_raw = training[training$new_window == "no",]
+train_aggregate = training[training$new_window == "yes",]
+```
+
+
+
+## Model Fitting
+
+As the sensor data is in general very noisy, random forests will be good for building the model
+
+### Model 1:
+In Model 1, we will be training and predicting using the raw sensor data with bootstrapping as the cross-validation method
+```{r}
+bootstrapping = trainControl(method = "boot", number = 100)
+raw_rf =  train(classe~., method = "ranger", trControl = bootstrapping, data = train_raw[,-c(1:7)])
+pred_raw_rf = predict(raw_rf, testing)
+confusionMatrix(pred_raw_rf, as.factor(testing$classe))
+```
+
+As we can see, this model has an accuracy of 99.52%, or in other words, an error rate of 0.48%. However, having such a high accuracy rate can be a sign of over-fitting. Thus, we will try the other possible models/cross-validation methods to see which might be the most suitable for accurate predictions outside of the data set.
+
+
+
+### Model 2:
+In Model 2, we will be training and predicting using the aggregate sensor data. We will use gradient boosting and bootstrapping for cross-validation of the model
+```{r, include = FALSE}
+aggregate_gbm = train(classe~., method = "gbm", trControl = bootstrapping, data = train_aggregate[,-c(1:7)])
+pred_aggregate_gbm = predict(aggregate_gbm, testing)
+confusionMatrix(pred_aggregate_gbm, as.factor(testing$classe))
+```
+
+This model sees a large drop in accuracy, falling down to 78%. This can be seen as a positive as the chances of over-fitting drop, but the loss in accuracy is not something we can compromise on.
+
+
+
+### Model 3:
+Model 3 will be a variation of model 2, using random forests instead of gradient boosting to see if the accuracy can be improved without worrying about over-fitting.
+```{r}
+aggregate_rf = train(classe~., method = "rf", trControl = bootstrapping, data = train_aggregate[,-c(1:7)])
+pred_aggregate_rf = predict(aggregate_rf, testing)
+confusionMatrix(pred_aggregate_rf, as.factor(testing$classe))
+```
+
+This Model has a similar accuracy of 78%, showing that the problem is with the shorter aggregate data set and not the type of model.
+
+
+
+## Conclusions
+
+Seeing as Model 1 has the highest accuracy of 99.52%, we will use that for predicting the validation set. The other two models suffered from a lack of good data and so did not have good accuracy.
+
+```{r}
+predict(raw_rf, validation)
+```
+
